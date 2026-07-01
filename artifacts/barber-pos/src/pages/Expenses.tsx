@@ -48,7 +48,7 @@ export default function Expenses() {
       description: form.description.trim(),
       amount: Number(form.amount),
       category: form.category,
-      date: new Date(form.date),
+      date: new Date(form.date + "T12:00:00"),
       notes: form.notes || undefined,
     });
     await load();

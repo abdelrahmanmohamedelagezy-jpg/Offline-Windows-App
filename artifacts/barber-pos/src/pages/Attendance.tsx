@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { db, Barber, AttendanceRecord } from "@/lib/db";
-import { FileDown, Save } from "lucide-react";
+import { FileDown, Save, LogIn, LogOut, Clock } from "lucide-react";
 import { exportAttendancePDF } from "@/lib/exportReport";
 
 type AttendanceStatus = "present" | "absent" | "late";
+
+function nowTime() {
+  const now = new Date();
+  return now.toTimeString().slice(0, 5); // "HH:MM"
+}
 
 export default function Attendance() {
   const [barbers, setBarbers] = useState<Barber[]>([]);
@@ -14,16 +19,14 @@ export default function Attendance() {
   const [toDate, setToDate] = useState(new Date().toISOString().split("T")[0]);
 
   const load = async () => {
-    // Use filter instead of Dexie boolean index query (boolean vs number issue)
     const all = await db.barbers.toArray();
     const bs = all.filter(b => b.active);
     setBarbers(bs);
-
     const existing = await db.attendance.where("date").equals(date).toArray();
     const map = new Map<number, Partial<AttendanceRecord>>();
     for (const b of bs) {
       const rec = existing.find(e => e.barberId === b.id);
-      map.set(b.id!, rec || { barberId: b.id, barberName: b.name, date, status: "present", checkIn: "09:00" });
+      map.set(b.id!, rec || { barberId: b.id, barberName: b.name, date, status: undefined });
     }
     setRecords(map);
     setSaved(false);
@@ -31,11 +34,47 @@ export default function Attendance() {
 
   useEffect(() => { load(); }, [date]);
 
-  const update = (barberId: number, field: string, value: string) => {
+  const update = (barberId: number, fields: Partial<AttendanceRecord>) => {
     setRecords(prev => {
       const next = new Map(prev);
       const rec = next.get(barberId) || {};
-      next.set(barberId, { ...rec, [field]: value });
+      next.set(barberId, { ...rec, ...fields });
+      return next;
+    });
+    setSaved(false);
+  };
+
+  // Click "حاضر" or "متأخر" → set status + auto-stamp check-in if not set
+  const markArrival = (barberId: number, status: "present" | "late") => {
+    setRecords(prev => {
+      const next = new Map(prev);
+      const rec = next.get(barberId) || {};
+      next.set(barberId, {
+        ...rec,
+        status,
+        checkIn: rec.checkIn || nowTime(), // auto-stamp only if not already set
+      });
+      return next;
+    });
+    setSaved(false);
+  };
+
+  // Click "انصراف" → auto-stamp check-out now
+  const markDeparture = (barberId: number) => {
+    setRecords(prev => {
+      const next = new Map(prev);
+      const rec = next.get(barberId) || {};
+      next.set(barberId, { ...rec, checkOut: nowTime() });
+      return next;
+    });
+    setSaved(false);
+  };
+
+  const markAbsent = (barberId: number) => {
+    setRecords(prev => {
+      const next = new Map(prev);
+      const rec = next.get(barberId) || {};
+      next.set(barberId, { ...rec, status: "absent", checkIn: undefined, checkOut: undefined });
       return next;
     });
     setSaved(false);
@@ -43,13 +82,17 @@ export default function Attendance() {
 
   const saveAll = async () => {
     for (const [barberId, rec] of records) {
-      const existing = await db.attendance.where("barberId").equals(barberId).and(r => r.date === date).first();
+      if (!rec.status) continue; // skip unset rows
+      const existing = await db.attendance
+        .where("barberId").equals(barberId)
+        .and(r => r.date === date)
+        .first();
       const barber = barbers.find(b => b.id === barberId);
       const data = {
         barberId,
         barberName: barber?.name || rec.barberName || "",
         date,
-        status: (rec.status || "present") as AttendanceStatus,
+        status: rec.status as AttendanceStatus,
         checkIn: rec.checkIn,
         checkOut: rec.checkOut,
         notes: rec.notes,
@@ -76,10 +119,11 @@ export default function Attendance() {
     })));
   };
 
-  const statusColors: Record<AttendanceStatus, string> = {
+  const statusBorder: Record<string, string> = {
     present: "border-r-green-500 bg-green-50/30",
-    late: "border-r-yellow-500 bg-yellow-50/30",
-    absent: "border-r-red-500 bg-red-50/30",
+    late:    "border-r-yellow-500 bg-yellow-50/30",
+    absent:  "border-r-red-500 bg-red-50/30",
+    "":      "border-r-gray-200 bg-white",
   };
 
   return (
@@ -101,15 +145,24 @@ export default function Attendance() {
             }`}
           >
             <Save className="w-4 h-4" />
-            {saved ? "تم الحفظ" : "حفظ الحضور"}
+            {saved ? "تم الحفظ ✓" : "حفظ الحضور"}
           </button>
         </div>
       </div>
 
-      {/* Attendance Table */}
+      {/* Quick-stamp hint */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3 text-sm text-blue-700">
+        <Clock className="w-4 h-4 flex-shrink-0" />
+        <span>اضغط <strong>حاضر</strong> أو <strong>متأخر</strong> لتسجيل وقت الدخول تلقائيًا، ثم اضغط <strong>انصراف</strong> عند المغادرة لتسجيل وقت الخروج.</span>
+      </div>
+
+      {/* Attendance Cards */}
       <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div className="bg-[#003366] text-white px-5 py-3">
+        <div className="bg-[#003366] text-white px-5 py-3 flex items-center justify-between">
           <h2 className="font-bold text-sm">تسجيل الحضور — {date}</h2>
+          <span className="text-white/60 text-xs">
+            {Array.from(records.values()).filter(r => r.status === "present" || r.status === "late").length} / {barbers.length} حضروا
+          </span>
         </div>
 
         {barbers.length === 0 ? (
@@ -121,52 +174,118 @@ export default function Attendance() {
           <div className="divide-y divide-border">
             {barbers.map(b => {
               const rec = records.get(b.id!) || {};
-              const status = (rec.status || "present") as AttendanceStatus;
+              const status = rec.status || "";
+              const hasCheckedIn  = !!(rec.checkIn);
+              const hasCheckedOut = !!(rec.checkOut);
+
               return (
-                <div key={b.id} className={`flex items-center gap-4 px-5 py-4 border-r-4 transition-colors ${statusColors[status]}`}>
+                <div
+                  key={b.id}
+                  className={`flex flex-wrap items-center gap-3 px-5 py-4 border-r-4 transition-colors ${statusBorder[status]}`}
+                >
+                  {/* Avatar + Name */}
                   <div className="w-10 h-10 rounded-full bg-[#003366] flex items-center justify-center text-white font-black text-sm flex-shrink-0">
                     {b.name[0]}
                   </div>
-                  <div className="w-36 flex-shrink-0">
+                  <div className="w-32 flex-shrink-0">
                     <p className="font-bold text-sm text-[#003366]">{b.name}</p>
                     <p className="text-xs text-muted-foreground">{b.code}</p>
                   </div>
+
+                  {/* Status Buttons */}
                   <div className="flex gap-2 flex-shrink-0">
-                    {(["present", "late", "absent"] as AttendanceStatus[]).map(s => (
+                    <button
+                      onClick={() => markArrival(b.id!, "present")}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        status === "present"
+                          ? "bg-green-600 text-white border-green-600 shadow-sm"
+                          : "border-green-200 text-green-700 hover:bg-green-50 bg-white"
+                      }`}
+                    >
+                      <LogIn className="w-3 h-3" />
+                      حاضر
+                    </button>
+                    <button
+                      onClick={() => markArrival(b.id!, "late")}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        status === "late"
+                          ? "bg-yellow-500 text-white border-yellow-500 shadow-sm"
+                          : "border-yellow-200 text-yellow-700 hover:bg-yellow-50 bg-white"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      متأخر
+                    </button>
+                    <button
+                      onClick={() => markAbsent(b.id!)}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        status === "absent"
+                          ? "bg-[#CD0000] text-white border-[#CD0000] shadow-sm"
+                          : "border-red-200 text-red-600 hover:bg-red-50 bg-white"
+                      }`}
+                    >
+                      غائب
+                    </button>
+                  </div>
+
+                  {/* Departure button + Times */}
+                  {status !== "absent" && status !== "" && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Check-in badge */}
+                      {hasCheckedIn && (
+                        <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-2.5 py-1">
+                          <LogIn className="w-3 h-3 text-green-600" />
+                          <span className="text-xs font-bold text-green-700">{rec.checkIn}</span>
+                          <input
+                            type="time"
+                            value={rec.checkIn || ""}
+                            onChange={e => update(b.id!, { checkIn: e.target.value })}
+                            className="text-xs border-0 bg-transparent text-green-700 focus:outline-none w-0 opacity-0 absolute"
+                            tabIndex={-1}
+                          />
+                          <button
+                            onClick={() => update(b.id!, { checkIn: nowTime() })}
+                            title="تحديث وقت الدخول للآن"
+                            className="text-green-500 hover:text-green-700 transition"
+                          >
+                            <Clock className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Departure button */}
                       <button
-                        key={s}
-                        onClick={() => update(b.id!, "status", s)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
-                          status === s
-                            ? s === "present" ? "bg-green-600 text-white border-green-600"
-                              : s === "late" ? "bg-yellow-500 text-white border-yellow-500"
-                              : "bg-[#CD0000] text-white border-[#CD0000]"
-                            : "border-gray-200 text-muted-foreground hover:border-gray-300 bg-white"
+                        onClick={() => markDeparture(b.id!)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                          hasCheckedOut
+                            ? "bg-[#003366] text-white border-[#003366] shadow-sm"
+                            : "border-[#003366] text-[#003366] hover:bg-blue-50 bg-white"
                         }`}
                       >
-                        {s === "present" ? "حاضر" : s === "late" ? "متأخر" : "غائب"}
+                        <LogOut className="w-3 h-3" />
+                        {hasCheckedOut ? `انصرف ${rec.checkOut}` : "تسجيل الانصراف"}
                       </button>
-                    ))}
-                  </div>
-                  {status !== "absent" && (
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-xs text-muted-foreground whitespace-nowrap">وقت الدخول</label>
-                        <input
-                          type="time"
-                          value={rec.checkIn || ""}
-                          onChange={e => update(b.id!, "checkIn", e.target.value)}
-                          className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#003366] bg-white"
-                        />
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-xs text-muted-foreground whitespace-nowrap">وقت الخروج</label>
-                        <input
-                          type="time"
-                          value={rec.checkOut || ""}
-                          onChange={e => update(b.id!, "checkOut", e.target.value)}
-                          className="border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#003366] bg-white"
-                        />
+
+                      {/* Manual time overrides (compact) */}
+                      <div className="flex items-center gap-2 mr-1">
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs text-muted-foreground">دخول</label>
+                          <input
+                            type="time"
+                            value={rec.checkIn || ""}
+                            onChange={e => update(b.id!, { checkIn: e.target.value })}
+                            className="border border-border rounded-md px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#003366] bg-white w-20"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <label className="text-xs text-muted-foreground">خروج</label>
+                          <input
+                            type="time"
+                            value={rec.checkOut || ""}
+                            onChange={e => update(b.id!, { checkOut: e.target.value })}
+                            className="border border-border rounded-md px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#003366] bg-white w-20"
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
