@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, Expense } from "@/lib/db";
 import { Plus, Trash2, FileDown } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportExpensesPDF } from "@/lib/exportReport";
 
 const categories = ["إيجار", "فواتير", "أدوات", "خامات", "رواتب", "صيانة", "أخرى"];
 
@@ -68,23 +67,14 @@ export default function Expenses() {
   const total = expenses.reduce((s, e) => s + e.amount, 0);
 
   const exportPDF = () => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Omar Elsadany - Expenses Report", 105, 20, { align: "center" });
-    doc.setFontSize(11);
-    doc.text(`Filter: ${filterOptions.find(f => f.value === filter)?.label}`, 105, 28, { align: "center" });
-    autoTable(doc, {
-      startY: 35,
-      head: [["#", "Description", "Category", "Amount (EGP)", "Date"]],
-      body: expenses.map((e, i) => [
-        String(i + 1), e.description, e.category,
-        String(e.amount), new Date(e.date).toLocaleDateString("ar-EG"),
-      ]),
-      foot: [["", "", "Total", String(total) + " EGP", ""]],
-      styles: { font: "helvetica", fontSize: 10 },
-    });
-    doc.save("expenses-report.pdf");
+    const filterLabel = filterOptions.find(f => f.value === filter)?.label || "";
+    exportExpensesPDF(filterLabel, expenses.map(e => ({
+      description: e.description,
+      category: e.category,
+      amount: e.amount,
+      date: e.date,
+      notes: e.notes,
+    })));
   };
 
   return (

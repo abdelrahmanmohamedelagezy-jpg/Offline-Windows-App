@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, Product } from "@/lib/db";
-import { Plus, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, AlertTriangle, FileDown } from "lucide-react";
+import { exportInventoryPDF } from "@/lib/exportReport";
 
 const CATEGORIES = ["تصفيف", "عناية", "حلاقة", "تلوين", "أخرى"];
 
@@ -36,12 +37,21 @@ export default function Inventory() {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-black text-[#003366]">الجرد والمنتجات</h1>
-        <button data-testid="btn-add-product" onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-[#CD0000] text-white rounded-xl font-bold text-sm hover:bg-[#a30000] transition shadow-md">
-          <Plus className="w-4 h-4" />
-          منتج جديد
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => exportInventoryPDF(products)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-border text-[#003366] rounded-xl font-semibold text-sm hover:bg-gray-50 transition shadow-sm"
+          >
+            <FileDown className="w-4 h-4" />
+            تصدير PDF
+          </button>
+          <button data-testid="btn-add-product" onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-[#CD0000] text-white rounded-xl font-bold text-sm hover:bg-[#a30000] transition shadow-md">
+            <Plus className="w-4 h-4" />
+            منتج جديد
+          </button>
+        </div>
       </div>
 
       {lowStock.length > 0 && (

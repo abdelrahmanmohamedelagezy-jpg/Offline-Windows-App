@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { db, Barber, AttendanceRecord } from "@/lib/db";
 import { FileDown, Save } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportAttendancePDF } from "@/lib/exportReport";
 
 type AttendanceStatus = "present" | "absent" | "late";
 
@@ -67,26 +66,14 @@ export default function Attendance() {
   const exportPDF = async () => {
     const allRecs = await db.attendance.toArray();
     const filtered = allRecs.filter(r => r.date >= fromDate && r.date <= toDate);
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("Omar Elsadany - Attendance Report", 148, 15, { align: "center" });
-    doc.setFontSize(10);
-    doc.text(`Period: ${fromDate} to ${toDate}`, 148, 22, { align: "center" });
-    autoTable(doc, {
-      startY: 28,
-      head: [["Date", "Barber", "Status", "Check In", "Check Out", "Notes"]],
-      body: filtered.sort((a, b) => a.date.localeCompare(b.date)).map(r => [
-        r.date,
-        r.barberName,
-        r.status === "present" ? "Present" : r.status === "late" ? "Late" : "Absent",
-        r.checkIn || "-",
-        r.checkOut || "-",
-        r.notes || "-",
-      ]),
-      styles: { font: "helvetica", fontSize: 9 },
-    });
-    doc.save(`attendance-${fromDate}-${toDate}.pdf`);
+    exportAttendancePDF(fromDate, toDate, filtered.map(r => ({
+      date: r.date,
+      barberName: r.barberName,
+      status: r.status,
+      checkIn: r.checkIn,
+      checkOut: r.checkOut,
+      notes: r.notes,
+    })));
   };
 
   const statusColors: Record<AttendanceStatus, string> = {

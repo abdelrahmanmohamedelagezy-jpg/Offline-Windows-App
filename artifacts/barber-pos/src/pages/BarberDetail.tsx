@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { db, Barber, Invoice, AttendanceRecord, PayrollAdjustment } from "@/lib/db";
 import { ArrowRight, Plus, FileDown } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportBarberPDF } from "@/lib/exportReport";
 
 export default function BarberDetail() {
   const { id } = useParams<{ id: string }>();
@@ -66,58 +65,19 @@ export default function BarberDetail() {
 
   const exportPDF = () => {
     if (!barber) return;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Omar Elsadany - Barber Payroll Report", 105, 18, { align: "center" });
-    doc.setFontSize(12);
-    doc.text(`Barber: ${barber.name} (${barber.code})`, 14, 30);
-    doc.text(`Period: ${fromDate} to ${toDate}`, 14, 38);
-
-    autoTable(doc, {
-      startY: 45,
-      head: [["Item", "Value"]],
-      body: [
-        ["Total Invoices", String(invoices.length)],
-        ["Total Revenue", `${totalRevenue} EGP`],
-        ["Days Present", String(presentDays)],
-        ["Days Absent", String(absentDays)],
-        ["Days Late", String(lateDays)],
-        ["Bonuses", `+${bonuses} EGP`],
-        ["Deductions", `-${deductions} EGP`],
-        ["Net Adjustment", `${netSalary} EGP`],
-      ],
-      styles: { font: "helvetica", fontSize: 11 },
+    exportBarberPDF({
+      name: barber.name, code: barber.code, phone: barber.phone,
+      fromDate, toDate,
+      invoices: invoices.map(inv => ({
+        clientName: inv.clientName, total: inv.total, date: inv.date,
+        items: inv.items.map(i => ({ name: i.name })),
+      })),
+      totalRevenue, presentDays, absentDays, lateDays,
+      bonuses, deductions, netSalary,
+      adjustments: adjustments.map(a => ({
+        type: a.type, amount: a.amount, reason: a.reason, date: a.date,
+      })),
     });
-
-    const y1 = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(13);
-    doc.text("Invoices", 14, y1);
-    autoTable(doc, {
-      startY: y1 + 5,
-      head: [["#", "Client", "Total", "Date"]],
-      body: invoices.map((inv, i) => [
-        String(i + 1), inv.clientName || "-", `${inv.total} EGP`,
-        new Date(inv.date).toLocaleDateString("ar-EG"),
-      ]),
-      styles: { font: "helvetica", fontSize: 9 },
-    });
-
-    const y2 = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("Adjustments", 14, y2);
-    autoTable(doc, {
-      startY: y2 + 5,
-      head: [["Type", "Amount", "Reason", "Date"]],
-      body: adjustments.map(a => [
-        a.type === "bonus" ? "Bonus" : "Deduction",
-        `${a.type === "bonus" ? "+" : "-"}${a.amount} EGP`,
-        a.reason,
-        new Date(a.date).toLocaleDateString("ar-EG"),
-      ]),
-      styles: { font: "helvetica", fontSize: 9 },
-    });
-
-    doc.save(`barber-${barber.code}-report.pdf`);
   };
 
   if (!barber) return <div className="text-center py-12 text-muted-foreground">جاري التحميل...</div>;

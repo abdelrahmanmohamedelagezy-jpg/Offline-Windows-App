@@ -7,8 +7,7 @@ import {
   ShoppingCart, Boxes, CalendarCheck, BarChart2,
   FileText, AlertCircle
 } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportEndOfDayPDF } from "@/lib/exportReport";
 
 export default function Dashboard() {
   const { isOwner } = useAuth();
@@ -50,44 +49,14 @@ export default function Dashboard() {
     const totalExpenses = allExpenses.reduce((s, e) => s + e.amount, 0);
     const netProfit = totalRevenue - totalExpenses;
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("Omar Elsadany Barber - End of Day Report", 105, 20, { align: "center" });
-    doc.setFontSize(12);
-    doc.text(`Date: ${today.toLocaleDateString("ar-EG")}`, 105, 30, { align: "center" });
-
-    doc.setFontSize(14);
-    doc.text("Summary", 14, 45);
-    autoTable(doc, {
-      startY: 50,
-      head: [["Item", "Amount"]],
-      body: [
-        ["Total Revenue", `${totalRevenue} EGP`],
-        ["Total Expenses", `${totalExpenses} EGP`],
-        ["Net Profit", `${netProfit} EGP`],
-        ["Total Invoices", String(active.length)],
-      ],
-      styles: { font: "helvetica", fontSize: 11 },
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("Invoices", 14, finalY);
-    autoTable(doc, {
-      startY: finalY + 5,
-      head: [["#", "Type", "Barber", "Client", "Total", "Time"]],
-      body: active.map((inv, i) => [
-        String(i + 1),
-        inv.type === "service" ? "Service" : "Product",
-        inv.barberName || "-",
-        inv.clientName || "-",
-        `${inv.total} EGP`,
-        new Date(inv.date).toLocaleTimeString("ar-EG"),
-      ]),
-      styles: { font: "helvetica", fontSize: 9 },
-    });
-
-    doc.save(`end-of-day-${today.toISOString().split("T")[0]}.pdf`);
+    exportEndOfDayPDF(
+      today.toLocaleDateString("ar-EG"),
+      active.map(inv => ({
+        type: inv.type, barberName: inv.barberName,
+        clientName: inv.clientName, total: inv.total, date: inv.date,
+      })),
+      totalExpenses
+    );
   };
 
   const quickLinks = [

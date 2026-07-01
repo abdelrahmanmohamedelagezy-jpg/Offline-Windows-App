@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/db";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { FileDown } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { exportFinancialPDF } from "@/lib/exportReport";
 
 export default function Reports() {
   const [fromDate, setFromDate] = useState(() => {
@@ -49,47 +48,8 @@ export default function Reports() {
 
   useEffect(() => { load(); }, [fromDate, toDate]);
 
-  const exportPDF = async () => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Omar Elsadany - Financial Report", 105, 18, { align: "center" });
-    doc.setFontSize(11);
-    doc.text(`Period: ${fromDate} to ${toDate}`, 105, 26, { align: "center" });
-
-    autoTable(doc, {
-      startY: 33,
-      head: [["Metric", "Value"]],
-      body: [
-        ["Total Revenue", `${data.revenue} EGP`],
-        ["Service Revenue", `${data.serviceRevenue} EGP`],
-        ["Product Revenue", `${data.productRevenue} EGP`],
-        ["Total Expenses", `${data.expenses} EGP`],
-        ["Net Profit", `${data.profit} EGP`],
-        ["Total Invoices", String(data.invoiceCount)],
-      ],
-      styles: { font: "helvetica", fontSize: 11 },
-    });
-
-    const y1 = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("Revenue by Barber", 14, y1);
-    autoTable(doc, {
-      startY: y1 + 5,
-      head: [["Barber", "Revenue (EGP)"]],
-      body: barberData.map(b => [b.name, String(b.total)]),
-      styles: { font: "helvetica", fontSize: 10 },
-    });
-
-    const y2 = (doc as any).lastAutoTable.finalY + 10;
-    doc.text("Top Services", 14, y2);
-    autoTable(doc, {
-      startY: y2 + 5,
-      head: [["Service", "Count"]],
-      body: serviceData.map(s => [s.name, String(s.count)]),
-      styles: { font: "helvetica", fontSize: 10 },
-    });
-
-    doc.save(`report-${fromDate}-${toDate}.pdf`);
+  const exportPDF = () => {
+    exportFinancialPDF(fromDate, toDate, data, barberData, serviceData);
   };
 
   return (
