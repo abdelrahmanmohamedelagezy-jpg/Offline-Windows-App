@@ -34,7 +34,7 @@ export default function Login() {
         backgroundPosition: "center",
       }}
     >
-      {/* Overlay */}
+      {/* Dark overlay */}
       <div className="absolute inset-0 bg-[#003366]/80" />
 
       {/* Card */}
@@ -93,9 +93,10 @@ export default function Login() {
                 {loading ? "جاري الدخول..." : "دخول"}
               </button>
             </form>
-            <div className="mt-6 text-center text-xs text-gray-400">
-              <p>المالك: admin / admin123</p>
-              <p>كاشير: cashier / 1234</p>
+
+            {/* Developer credit instead of credentials hint */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-300">تصميم وتطوير: عبد الرحمن العديزي</p>
             </div>
           </div>
         </div>

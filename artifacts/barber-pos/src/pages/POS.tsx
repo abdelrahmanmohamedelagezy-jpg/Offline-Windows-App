@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { db, Barber, Service, InvoiceItem } from "@/lib/db";
 import { Trash2, Plus, Minus, Printer, RotateCcw, CheckCircle } from "lucide-react";
-import { QRCodeSVG } from "qrcode.react";
+import { openReceiptWindow } from "@/lib/printReceipt";
+import { getSettings } from "@/lib/settings";
 
 interface CartItem extends InvoiceItem {}
 
@@ -14,11 +15,10 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [saved, setSaved] = useState(false);
   const [invoiceId, setInvoiceId] = useState<number | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    db.barbers.where("active").equals(1).toArray().then(setBarbers);
-    db.services.where("active").equals(1).toArray().then(setServices);
+    db.barbers.toArray().then(all => setBarbers(all.filter(b => b.active)));
+    db.services.toArray().then(all => setServices(all.filter(s => s.active)));
   }, []);
 
   const addToCart = (service: Service) => {
@@ -58,8 +58,20 @@ export default function POS() {
     setSaved(true);
   };
 
-  const print = () => {
-    window.print();
+  const handlePrint = () => {
+    const settings = getSettings();
+    openReceiptWindow({
+      invoiceId,
+      type: "service",
+      barberName: selectedBarber?.name,
+      clientName: clientName || undefined,
+      clientPhone: clientPhone || undefined,
+      items: cart,
+      total,
+      date: new Date(),
+      instagramHandle: settings.instagramHandle,
+      tiktokHandle: settings.tiktokHandle,
+    });
   };
 
   const reset = () => {
@@ -73,12 +85,12 @@ export default function POS() {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <h1 className="text-2xl font-black text-[#003366]">نقطة البيع - الخدمات</h1>
+      <h1 className="text-2xl font-black text-[#003366]">نقطة البيع — الخدمات</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Services Grid */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Barber & Client */}
+          {/* Barber & Client Info */}
           <div className="bg-white rounded-2xl border border-border p-5 shadow-sm space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -93,13 +105,17 @@ export default function POS() {
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]"
                 >
                   <option value="">اختر الحلاق</option>
-                  {barbers.map(b => <option key={b.id} value={b.id}>{b.name} ({b.code})</option>)}
+                  {barbers.map(b => (
+                    <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
+                  ))}
                 </select>
+                {barbers.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">لا يوجد حلاقون نشطون — أضف حلاقًا من صفحة الحلاقين أولًا</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-semibold text-[#003366] mb-1.5">اسم العميل (اختياري)</label>
                 <input
-                  data-testid="input-client-name"
                   type="text"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
@@ -110,7 +126,6 @@ export default function POS() {
               <div>
                 <label className="block text-sm font-semibold text-[#003366] mb-1.5">رقم الهاتف (اختياري)</label>
                 <input
-                  data-testid="input-client-phone"
                   type="tel"
                   value={clientPhone}
                   onChange={e => setClientPhone(e.target.value)}
@@ -124,19 +139,25 @@ export default function POS() {
           {/* Services Grid */}
           <div className="bg-white rounded-2xl border border-border p-5 shadow-sm">
             <h2 className="text-base font-bold text-[#003366] mb-4">اختر الخدمات</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {services.map(service => (
-                <button
-                  key={service.id}
-                  data-testid={`service-${service.id}`}
-                  onClick={() => addToCart(service)}
-                  className="bg-red-50 hover:bg-[#CD0000] hover:text-white border border-red-100 text-[#003366] rounded-xl p-4 text-right transition-all group shadow-sm"
-                >
-                  <p className="font-bold text-sm mb-1 group-hover:text-white">{service.name}</p>
-                  <p className="text-[#C19A6B] font-black text-lg group-hover:text-yellow-200">{service.price} ج</p>
-                </button>
-              ))}
-            </div>
+            {services.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground">
+                <p className="text-sm">لا توجد خدمات نشطة — أضف خدمات من صفحة الخدمات والأسعار</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {services.map(service => (
+                  <button
+                    key={service.id}
+                    data-testid={`service-${service.id}`}
+                    onClick={() => addToCart(service)}
+                    className="bg-red-50 hover:bg-[#CD0000] hover:text-white border border-red-100 text-[#003366] rounded-xl p-4 text-right transition-all group shadow-sm"
+                  >
+                    <p className="font-bold text-sm mb-1 group-hover:text-white">{service.name}</p>
+                    <p className="text-[#C19A6B] font-black text-lg group-hover:text-yellow-200">{service.price} ج</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -155,7 +176,7 @@ export default function POS() {
                   <div key={item.id} className="flex items-center gap-2 bg-red-50/50 rounded-lg p-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#003366] truncate">{item.name}</p>
-                      <p className="text-xs text-[#CD0000] font-bold">{item.price} ج × {item.quantity}</p>
+                      <p className="text-xs text-[#CD0000] font-bold">{item.price} ج × {item.quantity} = {item.price * item.quantity} ج</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
@@ -193,7 +214,7 @@ export default function POS() {
               ) : (
                 <button
                   data-testid="btn-print"
-                  onClick={print}
+                  onClick={handlePrint}
                   className="w-full bg-[#003366] hover:bg-[#002244] text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
@@ -210,55 +231,6 @@ export default function POS() {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Print Receipt */}
-      <div className="hidden print:block" ref={printRef} dir="rtl" style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "8px" }}>
-        <div style={{ textAlign: "center", borderBottom: "2px dashed #000", paddingBottom: "8px", marginBottom: "8px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: "bold", margin: 0 }}>Omar Elsadany</h2>
-          <p style={{ margin: "2px 0", fontSize: "11px" }}>صالون الحلاقة</p>
-          <p style={{ margin: "2px 0", fontSize: "10px", color: "#555" }}>{new Date().toLocaleString("ar-EG")}</p>
-          {invoiceId && <p style={{ margin: "2px 0", fontSize: "10px" }}>فاتورة رقم: #{invoiceId}</p>}
-        </div>
-        {(selectedBarber || clientName) && (
-          <div style={{ marginBottom: "8px", fontSize: "11px" }}>
-            {selectedBarber && <p style={{ margin: "2px 0" }}>الحلاق: {selectedBarber.name}</p>}
-            {clientName && <p style={{ margin: "2px 0" }}>العميل: {clientName}</p>}
-            {clientPhone && <p style={{ margin: "2px 0" }}>الهاتف: {clientPhone}</p>}
-          </div>
-        )}
-        <div style={{ borderBottom: "1px dashed #000", marginBottom: "8px" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #000" }}>
-                <th style={{ textAlign: "right", padding: "2px 0", fontSize: "11px" }}>الخدمة</th>
-                <th style={{ textAlign: "center", padding: "2px 0", fontSize: "11px" }}>عدد</th>
-                <th style={{ textAlign: "left", padding: "2px 0", fontSize: "11px" }}>سعر</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.map(item => (
-                <tr key={item.id}>
-                  <td style={{ padding: "2px 0", fontSize: "11px" }}>{item.name}</td>
-                  <td style={{ textAlign: "center", padding: "2px 0", fontSize: "11px" }}>{item.quantity}</td>
-                  <td style={{ textAlign: "left", padding: "2px 0", fontSize: "11px" }}>{item.price * item.quantity} ج</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "14px", marginBottom: "12px" }}>
-          <span>الإجمالي:</span>
-          <span>{total} ج</span>
-        </div>
-        <div style={{ textAlign: "center", marginBottom: "8px" }}>
-          <QRCodeSVG value="https://instagram.com/omarelsadany" size={64} />
-          <p style={{ fontSize: "9px", marginTop: "4px" }}>@omarelsadany</p>
-        </div>
-        <div style={{ textAlign: "center", borderTop: "1px dashed #000", paddingTop: "8px", fontSize: "11px" }}>
-          <p style={{ margin: 0, fontWeight: "bold" }}>شكرًا لزيارتكم</p>
-          <p style={{ margin: "2px 0", fontSize: "10px" }}>نتمنى لكم يومًا سعيدًا</p>
         </div>
       </div>
     </div>

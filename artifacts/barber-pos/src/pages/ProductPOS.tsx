@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { db, Product, InvoiceItem } from "@/lib/db";
 import { Trash2, Plus, Minus, Printer, RotateCcw, CheckCircle, PackageX } from "lucide-react";
+import { openReceiptWindow } from "@/lib/printReceipt";
+import { getSettings } from "@/lib/settings";
 
 interface CartItem extends InvoiceItem { stock: number; }
 
@@ -27,7 +29,7 @@ export default function ProductPOS() {
       const existing = prev.find(c => c.id === product.id!);
       if (existing) {
         if (existing.quantity >= product.quantity) {
-          setError("الكمية المطلوبة تتجاوز المخزون");
+          setError("الكمية المطلوبة تتجاوز المخزون المتاح");
           setTimeout(() => setError(""), 3000);
           return prev;
         }
@@ -71,6 +73,21 @@ export default function ProductPOS() {
     setProducts(await db.products.toArray());
   };
 
+  const handlePrint = () => {
+    const settings = getSettings();
+    openReceiptWindow({
+      invoiceId,
+      type: "product",
+      clientName: clientName || undefined,
+      clientPhone: clientPhone || undefined,
+      items: cart,
+      total,
+      date: new Date(),
+      instagramHandle: settings.instagramHandle,
+      tiktokHandle: settings.tiktokHandle,
+    });
+  };
+
   const reset = () => {
     setCart([]);
     setClientName("");
@@ -81,7 +98,7 @@ export default function ProductPOS() {
 
   return (
     <div dir="rtl" className="space-y-4">
-      <h1 className="text-2xl font-black text-[#003366]">نقطة البيع - المنتجات</h1>
+      <h1 className="text-2xl font-black text-[#003366]">نقطة البيع — المنتجات</h1>
 
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
@@ -116,28 +133,31 @@ export default function ProductPOS() {
 
           <div className="bg-white rounded-2xl border border-border p-5 shadow-sm">
             <h2 className="text-base font-bold text-[#003366] mb-4">اختر المنتجات</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {products.map(product => (
-                <button
-                  key={product.id}
-                  data-testid={`product-${product.id}`}
-                  onClick={() => addToCart(product)}
-                  disabled={product.quantity <= 0}
-                  className={`border rounded-xl p-4 text-right transition-all shadow-sm ${
-                    product.quantity <= 0
-                      ? "bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed"
-                      : "bg-amber-50 hover:bg-[#C19A6B] hover:text-white border-amber-100 text-[#003366] group cursor-pointer"
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="font-bold text-sm">{product.name}</p>
-                    {product.quantity <= 0 && <PackageX className="w-4 h-4 text-gray-400" />}
-                  </div>
-                  <p className="text-[#CD0000] font-black text-lg">{product.sellPrice} ج</p>
-                  <p className="text-xs text-muted-foreground mt-1">المخزون: {product.quantity}</p>
-                </button>
-              ))}
-            </div>
+            {products.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">لا توجد منتجات — أضف منتجات من صفحة الجرد</div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {products.map(product => (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    disabled={product.quantity <= 0}
+                    className={`border rounded-xl p-4 text-right transition-all shadow-sm ${
+                      product.quantity <= 0
+                        ? "bg-gray-50 border-gray-200 opacity-50 cursor-not-allowed"
+                        : "bg-amber-50 hover:bg-[#C19A6B] hover:text-white border-amber-100 text-[#003366] cursor-pointer"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="font-bold text-sm">{product.name}</p>
+                      {product.quantity <= 0 && <PackageX className="w-4 h-4 text-gray-400" />}
+                    </div>
+                    <p className="text-[#CD0000] font-black text-lg">{product.sellPrice} ج</p>
+                    <p className="text-xs text-muted-foreground mt-1">المخزون: {product.quantity}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -154,7 +174,7 @@ export default function ProductPOS() {
                   <div key={item.id} className="flex items-center gap-2 bg-amber-50/50 rounded-lg p-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#003366] truncate">{item.name}</p>
-                      <p className="text-xs text-[#CD0000] font-bold">{item.price} ج × {item.quantity}</p>
+                      <p className="text-xs text-[#CD0000] font-bold">{item.price} ج × {item.quantity} = {item.price * item.quantity} ج</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button onClick={() => updateQty(item.id, -1)} className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
@@ -181,7 +201,6 @@ export default function ProductPOS() {
             <div className="px-4 pb-4 space-y-2">
               {!saved ? (
                 <button
-                  data-testid="btn-save-product-invoice"
                   onClick={saveInvoice}
                   disabled={cart.length === 0}
                   className="w-full bg-[#CD0000] hover:bg-[#a30000] disabled:opacity-50 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
@@ -191,7 +210,7 @@ export default function ProductPOS() {
                 </button>
               ) : (
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrint}
                   className="w-full bg-[#003366] hover:bg-[#002244] text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
@@ -207,43 +226,6 @@ export default function ProductPOS() {
               </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Print Section */}
-      <div className="hidden print:block" dir="rtl" style={{ fontFamily: "Arial, sans-serif", fontSize: "12px", width: "80mm", margin: "0 auto", padding: "8px" }}>
-        <div style={{ textAlign: "center", borderBottom: "2px dashed #000", paddingBottom: "8px", marginBottom: "8px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: "bold", margin: 0 }}>Omar Elsadany</h2>
-          <p style={{ margin: "2px 0", fontSize: "11px" }}>فاتورة مبيعات منتجات</p>
-          <p style={{ margin: "2px 0", fontSize: "10px" }}>{new Date().toLocaleString("ar-EG")}</p>
-          {invoiceId && <p style={{ margin: "2px 0", fontSize: "10px" }}>رقم: #{invoiceId}</p>}
-        </div>
-        {clientName && <p style={{ fontSize: "11px", margin: "4px 0" }}>العميل: {clientName}</p>}
-        {clientPhone && <p style={{ fontSize: "11px", margin: "4px 0" }}>الهاتف: {clientPhone}</p>}
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "8px" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #000" }}>
-              <th style={{ textAlign: "right", padding: "2px 0", fontSize: "11px" }}>المنتج</th>
-              <th style={{ textAlign: "center", padding: "2px 0", fontSize: "11px" }}>عدد</th>
-              <th style={{ textAlign: "left", padding: "2px 0", fontSize: "11px" }}>سعر</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cart.map(item => (
-              <tr key={item.id}>
-                <td style={{ padding: "2px 0", fontSize: "11px" }}>{item.name}</td>
-                <td style={{ textAlign: "center", padding: "2px 0", fontSize: "11px" }}>{item.quantity}</td>
-                <td style={{ textAlign: "left", padding: "2px 0", fontSize: "11px" }}>{item.price * item.quantity} ج</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "14px", marginTop: "8px", borderTop: "1px dashed #000", paddingTop: "8px" }}>
-          <span>الإجمالي:</span>
-          <span>{total} ج</span>
-        </div>
-        <div style={{ textAlign: "center", marginTop: "12px", fontSize: "11px" }}>
-          <p style={{ fontWeight: "bold" }}>شكرًا لزيارتكم</p>
         </div>
       </div>
     </div>

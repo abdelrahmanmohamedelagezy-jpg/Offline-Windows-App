@@ -16,8 +16,10 @@ import Barbers from "@/pages/Barbers";
 import BarberDetail from "@/pages/BarberDetail";
 import Attendance from "@/pages/Attendance";
 import Reports from "@/pages/Reports";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 import { seedIfEmpty } from "@/lib/db";
+import { getSettings } from "@/lib/settings";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,25 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+// Route that is accessible based on settings permissions for cashier
+function SettingsGatedRoute({
+  component: Component,
+  settingsKey,
+}: {
+  component: React.ComponentType;
+  settingsKey: keyof ReturnType<typeof getSettings>;
+}) {
+  const { user, isOwner } = useAuth();
+  if (!user) return <Redirect to="/login" />;
+  const settings = getSettings();
+  if (!isOwner() && !settings[settingsKey]) return <Redirect to="/" />;
+  return (
+    <AppLayout>
+      <Component />
+    </AppLayout>
+  );
+}
+
 function Router() {
   const { user } = useAuth();
   return (
@@ -52,13 +73,34 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/pos" component={() => <ProtectedRoute component={POS} />} />
       <Route path="/pos/products" component={() => <ProtectedRoute component={ProductPOS} />} />
-      <Route path="/services" component={() => <OwnerRoute component={Services} />} />
-      <Route path="/expenses" component={() => <OwnerRoute component={Expenses} />} />
       <Route path="/inventory" component={() => <ProtectedRoute component={Inventory} />} />
-      <Route path="/barbers" component={() => <OwnerRoute component={Barbers} />} />
+      <Route path="/services" component={() => <OwnerRoute component={Services} />} />
+      <Route
+        path="/expenses"
+        component={() => (
+          <SettingsGatedRoute component={Expenses} settingsKey="cashierCanViewExpenses" />
+        )}
+      />
+      <Route
+        path="/barbers"
+        component={() => (
+          <SettingsGatedRoute component={Barbers} settingsKey="cashierCanViewBarbers" />
+        )}
+      />
       <Route path="/barbers/:id" component={() => <OwnerRoute component={BarberDetail} />} />
-      <Route path="/attendance" component={() => <OwnerRoute component={Attendance} />} />
-      <Route path="/reports" component={() => <OwnerRoute component={Reports} />} />
+      <Route
+        path="/attendance"
+        component={() => (
+          <SettingsGatedRoute component={Attendance} settingsKey="cashierCanAccessAttendance" />
+        )}
+      />
+      <Route
+        path="/reports"
+        component={() => (
+          <SettingsGatedRoute component={Reports} settingsKey="cashierCanViewReports" />
+        )}
+      />
+      <Route path="/settings" component={() => <OwnerRoute component={Settings} />} />
       <Route component={NotFound} />
     </Switch>
   );
