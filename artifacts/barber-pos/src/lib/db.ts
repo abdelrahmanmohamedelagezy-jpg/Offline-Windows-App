@@ -44,6 +44,8 @@ export interface InvoiceItem {
   type: 'service' | 'product';
 }
 
+export type PaymentMethod = 'cash' | 'instapay' | 'vodafone';
+
 export interface Invoice {
   id?: number;
   type: 'service' | 'product';
@@ -55,6 +57,7 @@ export interface Invoice {
   total: number;
   date: Date;
   status: 'active' | 'voided';
+  paymentMethod?: PaymentMethod;
 }
 
 export interface Expense {
