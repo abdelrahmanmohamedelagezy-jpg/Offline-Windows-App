@@ -9,6 +9,8 @@ export interface User {
   phone?: string;
 }
 
+export type SalaryType = 'fixed' | 'percentage';
+
 export interface Barber {
   id?: number;
   code: string;
@@ -18,6 +20,8 @@ export interface Barber {
   notes?: string;
   active: boolean;
   createdAt: Date;
+  salaryType?: SalaryType;
+  salaryValue?: number;
 }
 
 export interface Service {

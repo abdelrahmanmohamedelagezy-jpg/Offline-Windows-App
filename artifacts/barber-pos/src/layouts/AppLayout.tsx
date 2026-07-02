@@ -4,7 +4,7 @@ import { getSettings } from "@/lib/settings";
 import {
   LayoutDashboard, Scissors, ShoppingCart, Boxes,
   DollarSign, Users, CalendarCheck, BarChart2,
-  LogOut, Package, ChevronRight, Settings
+  LogOut, Package, ChevronRight, Settings, FileText
 } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/expenses", label: "المصروفات", icon: DollarSign, show: isOwner() || settings.cashierCanViewExpenses },
     { href: "/barbers", label: "الحلاقين", icon: Users, show: isOwner() || settings.cashierCanViewBarbers },
     { href: "/attendance", label: "الحضور والانصراف", icon: CalendarCheck, show: isOwner() || settings.cashierCanAccessAttendance },
+    { href: "/invoices", label: "الفواتير", icon: FileText, show: isOwner() || settings.cashierCanViewReports },
     { href: "/reports", label: "التقارير", icon: BarChart2, show: isOwner() || settings.cashierCanViewReports },
     { href: "/settings", label: "الإعدادات", icon: Settings, show: isOwner() },
   ];

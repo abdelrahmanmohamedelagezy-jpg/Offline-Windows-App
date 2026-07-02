@@ -17,6 +17,7 @@ import BarberDetail from "@/pages/BarberDetail";
 import Attendance from "@/pages/Attendance";
 import Reports from "@/pages/Reports";
 import Settings from "@/pages/Settings";
+import Invoices from "@/pages/Invoices";
 import NotFound from "@/pages/not-found";
 import { seedIfEmpty } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
@@ -101,6 +102,12 @@ function Router() {
         )}
       />
       <Route path="/settings" component={() => <OwnerRoute component={Settings} />} />
+      <Route
+        path="/invoices"
+        component={() => (
+          <SettingsGatedRoute component={Invoices} settingsKey="cashierCanViewReports" />
+        )}
+      />
       <Route component={NotFound} />
     </Switch>
   );

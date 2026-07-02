@@ -413,3 +413,89 @@ export function exportInventoryPDF(products: ProductRow[]) {
     </div>`;
   openReportWindow("تقرير الجرد والمنتجات", body);
 }
+
+/* ── Invoices ───────────────────────────────────────────── */
+export interface InvoiceExportRow {
+  id?: number;
+  type: 'service' | 'product';
+  barberName?: string;
+  clientName?: string;
+  total: number;
+  date: Date;
+  status: 'active' | 'voided';
+  paymentMethod?: string;
+  items: { name: string; price: number; quantity: number }[];
+}
+
+const PAYMENT_LABELS_EXPORT: Record<string, string> = {
+  cash: "كاش",
+  instapay: "إنستا باي",
+  vodafone: "فودافون كاش",
+};
+
+export function exportInvoicesPDF(fromDate: string, toDate: string, rows: InvoiceExportRow[]) {
+  const active = rows.filter(r => r.status === "active");
+  const voided = rows.filter(r => r.status === "voided");
+  const totalRevenue = active.reduce((s, r) => s + r.total, 0);
+
+  const byCash     = active.filter(r => !r.paymentMethod || r.paymentMethod === "cash").reduce((s,r) => s+r.total,0);
+  const byInstapay = active.filter(r => r.paymentMethod === "instapay").reduce((s,r) => s+r.total,0);
+  const byVodafone = active.filter(r => r.paymentMethod === "vodafone").reduce((s,r) => s+r.total,0);
+
+  const pmBadge = (pm?: string) => {
+    if (!pm || pm === "cash") return `<span class="badge badge-green">كاش</span>`;
+    if (pm === "instapay")   return `<span class="badge" style="background:#f3e8ff;color:#7c3aed">إنستا باي</span>`;
+    if (pm === "vodafone")   return `<span class="badge badge-red">فودافون كاش</span>`;
+    return pm;
+  };
+
+  const body = `
+    <div class="section">
+      <div class="section-title">ملخص الفترة: ${fromDate} — ${toDate}</div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi-value">${active.length}</div><div class="kpi-label">فاتورة نشطة</div></div>
+        <div class="kpi gold"><div class="kpi-value">${totalRevenue} ج</div><div class="kpi-label">إجمالي الإيرادات</div></div>
+        <div class="kpi red"><div class="kpi-value">${voided.length}</div><div class="kpi-label">فاتورة ملغاة</div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">توزيع طرق الدفع</div>
+      <div class="kpi-grid">
+        <div class="kpi green"><div class="kpi-value">${byCash} ج</div><div class="kpi-label">كاش</div></div>
+        <div class="kpi" style="border-color:#e9d5ff"><div class="kpi-value" style="color:#7c3aed">${byInstapay} ج</div><div class="kpi-label">إنستا باي</div></div>
+        <div class="kpi red"><div class="kpi-value">${byVodafone} ج</div><div class="kpi-label">فودافون كاش</div></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">تفاصيل الفواتير (${rows.length} فاتورة)</div>
+      <table>
+        <thead><tr>
+          <th>#</th><th>النوع</th><th>الحلاق</th><th>العميل</th><th>البنود</th><th>الإجمالي</th><th>طريقة الدفع</th><th>التاريخ</th><th>الحالة</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="9" style="text-align:center;padding:20px;color:#888">لا توجد فواتير</td></tr>`
+            : rows.map(r => `
+            <tr style="${r.status === "voided" ? "opacity:0.5;text-decoration:line-through;" : ""}">
+              <td style="font-weight:900;color:#003366">#${r.id ?? "—"}</td>
+              <td>${r.type === "service" ? "خدمات" : "منتجات"}</td>
+              <td>${r.barberName || "—"}</td>
+              <td>${r.clientName || "—"}</td>
+              <td style="font-size:11px;color:#888">${r.items.map(i => `${i.name} ×${i.quantity}`).join("، ")}</td>
+              <td style="font-weight:900;color:#C19A6B">${r.total} ج</td>
+              <td>${pmBadge(r.paymentMethod)}</td>
+              <td style="font-size:11px">${new Date(r.date).toLocaleDateString("ar-EG")}</td>
+              <td>${r.status === "active" ? `<span class="badge badge-green">نشطة</span>` : `<span class="badge badge-red">ملغاة</span>`}</td>
+            </tr>`).join("")}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="5">الإجمالي (النشط فقط)</td>
+            <td>${totalRevenue} ج</td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  openReportWindow("تقرير الفواتير", body);
+}

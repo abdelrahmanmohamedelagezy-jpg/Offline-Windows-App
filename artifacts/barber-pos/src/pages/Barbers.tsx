@@ -1,25 +1,46 @@
 import { useState, useEffect } from "react";
-import { db, Barber } from "@/lib/db";
+import { db, Barber, SalaryType } from "@/lib/db";
 import { Link } from "wouter";
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ChevronLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, ChevronLeft, Percent, DollarSign } from "lucide-react";
 
 export default function Barbers() {
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Barber | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", phone: "", age: "", notes: "" });
+  const [form, setForm] = useState({
+    code: "", name: "", phone: "", age: "", notes: "",
+    salaryType: "fixed" as SalaryType, salaryValue: "",
+  });
   const [loading, setLoading] = useState(false);
 
   const load = async () => setBarbers(await db.barbers.toArray());
   useEffect(() => { load(); }, []);
 
-  const openAdd = () => { setEditing(null); setForm({ code: "", name: "", phone: "", age: "", notes: "" }); setModal(true); };
-  const openEdit = (b: Barber) => { setEditing(b); setForm({ code: b.code, name: b.name, phone: b.phone, age: String(b.age), notes: b.notes || "" }); setModal(true); };
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ code: "", name: "", phone: "", age: "", notes: "", salaryType: "fixed", salaryValue: "" });
+    setModal(true);
+  };
+  const openEdit = (b: Barber) => {
+    setEditing(b);
+    setForm({ code: b.code, name: b.name, phone: b.phone, age: String(b.age), notes: b.notes || "", salaryType: b.salaryType || "fixed", salaryValue: b.salaryValue !== undefined ? String(b.salaryValue) : "" });
+    setModal(true);
+  };
 
   const save = async () => {
     if (!form.code.trim() || !form.name.trim()) return;
     setLoading(true);
-    const data = { code: form.code.trim().toUpperCase(), name: form.name.trim(), phone: form.phone.trim(), age: Number(form.age) || 0, notes: form.notes || undefined, active: true, createdAt: new Date() };
+    const data: Omit<Barber, "id"> = {
+      code: form.code.trim().toUpperCase(),
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      age: Number(form.age) || 0,
+      notes: form.notes || undefined,
+      active: true,
+      createdAt: new Date(),
+      salaryType: form.salaryType,
+      salaryValue: form.salaryValue !== "" ? Number(form.salaryValue) : undefined,
+    };
     if (editing) await db.barbers.update(editing.id!, { ...data, active: editing.active, createdAt: editing.createdAt });
     else await db.barbers.add(data);
     await load();
@@ -33,6 +54,12 @@ export default function Barbers() {
 
   const toggle = async (b: Barber) => { await db.barbers.update(b.id!, { active: !b.active }); await load(); };
 
+  const salaryDisplay = (b: Barber) => {
+    if (b.salaryValue === undefined || b.salaryValue === null) return null;
+    if (b.salaryType === "percentage") return `نسبة ${b.salaryValue}%`;
+    return `مرتب ثابت ${b.salaryValue} ج`;
+  };
+
   return (
     <div dir="rtl" className="space-y-4">
       <div className="flex items-center justify-between">
@@ -44,40 +71,47 @@ export default function Barbers() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {barbers.map(b => (
-          <div key={b.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${b.active ? "border-border" : "border-gray-200 opacity-70"}`}>
-            <div className={`px-5 py-3 ${b.active ? "bg-[#003366]" : "bg-gray-400"} flex items-center justify-between`}>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[#CD0000] flex items-center justify-center text-white text-sm font-black">
-                  {b.name[0]}
+        {barbers.map(b => {
+          const sal = salaryDisplay(b);
+          return (
+            <div key={b.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${b.active ? "border-border" : "border-gray-200 opacity-70"}`}>
+              <div className={`px-5 py-3 ${b.active ? "bg-[#003366]" : "bg-gray-400"} flex items-center justify-between`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-[#CD0000] flex items-center justify-center text-white text-sm font-black">{b.name[0]}</div>
+                  <div>
+                    <p className="text-white font-bold text-sm">{b.name}</p>
+                    <p className="text-white/60 text-xs">{b.code}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white font-bold text-sm">{b.name}</p>
-                  <p className="text-white/60 text-xs">{b.code}</p>
-                </div>
-              </div>
-              <button onClick={() => toggle(b)} className="text-white/80 hover:text-white transition">
-                {b.active ? <ToggleRight className="w-6 h-6 text-green-300" /> : <ToggleLeft className="w-6 h-6" />}
-              </button>
-            </div>
-            <div className="px-5 py-4 space-y-1.5">
-              <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">الهاتف:</span> {b.phone}</p>
-              <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">العمر:</span> {b.age} سنة</p>
-              {b.notes && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">ملاحظات:</span> {b.notes}</p>}
-              <p className="text-xs text-muted-foreground">تاريخ التسجيل: {new Date(b.createdAt).toLocaleDateString("ar-EG")}</p>
-            </div>
-            <div className="px-4 pb-4 flex items-center gap-2">
-              <Link href={`/barbers/${b.id}`} className="flex-1">
-                <button className="w-full flex items-center justify-center gap-2 bg-blue-50 text-[#003366] hover:bg-blue-100 font-semibold py-2 rounded-xl text-sm transition">
-                  <ChevronLeft className="w-4 h-4" />
-                  تفاصيل / الراتب
+                <button onClick={() => toggle(b)} className="text-white/80 hover:text-white transition">
+                  {b.active ? <ToggleRight className="w-6 h-6 text-green-300" /> : <ToggleLeft className="w-6 h-6" />}
                 </button>
-              </Link>
-              <button onClick={() => openEdit(b)} className="p-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 transition"><Pencil className="w-4 h-4" /></button>
-              <button onClick={() => remove(b.id!)} className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition"><Trash2 className="w-4 h-4" /></button>
+              </div>
+              <div className="px-5 py-4 space-y-1.5">
+                <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">الهاتف:</span> {b.phone}</p>
+                <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">العمر:</span> {b.age} سنة</p>
+                {sal && (
+                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${b.salaryType === "percentage" ? "bg-purple-50 text-purple-700" : "bg-green-50 text-green-700"}`}>
+                    {b.salaryType === "percentage" ? <Percent className="w-3 h-3" /> : <DollarSign className="w-3 h-3" />}
+                    {sal}
+                  </div>
+                )}
+                {b.notes && <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">ملاحظات:</span> {b.notes}</p>}
+                <p className="text-xs text-muted-foreground">تاريخ التسجيل: {new Date(b.createdAt).toLocaleDateString("ar-EG")}</p>
+              </div>
+              <div className="px-4 pb-4 flex items-center gap-2">
+                <Link href={`/barbers/${b.id}`} className="flex-1">
+                  <button className="w-full flex items-center justify-center gap-2 bg-blue-50 text-[#003366] hover:bg-blue-100 font-semibold py-2 rounded-xl text-sm transition">
+                    <ChevronLeft className="w-4 h-4" />
+                    تفاصيل / الراتب
+                  </button>
+                </Link>
+                <button onClick={() => openEdit(b)} className="p-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 transition"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => remove(b.id!)} className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition"><Trash2 className="w-4 h-4" /></button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {modal && (
@@ -105,6 +139,37 @@ export default function Barbers() {
                   <input type="number" value={form.age} onChange={e => setForm(p => ({...p, age: e.target.value}))} className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]" placeholder="0" min="16" max="70" />
                 </div>
               </div>
+
+              {/* Salary Section */}
+              <div className="border border-border rounded-xl p-4 bg-gray-50/60">
+                <p className="text-sm font-bold text-[#003366] mb-3">نظام الراتب</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button type="button"
+                    onClick={() => setForm(p => ({...p, salaryType: "fixed"}))}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-bold transition ${form.salaryType === "fixed" ? "bg-green-600 text-white border-green-600" : "bg-white text-gray-600 border-border hover:bg-gray-50"}`}>
+                    <DollarSign className="w-4 h-4" /> مرتب ثابت
+                  </button>
+                  <button type="button"
+                    onClick={() => setForm(p => ({...p, salaryType: "percentage"}))}
+                    className={`flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-bold transition ${form.salaryType === "percentage" ? "bg-purple-600 text-white border-purple-600" : "bg-white text-gray-600 border-border hover:bg-gray-50"}`}>
+                    <Percent className="w-4 h-4" /> نسبة مئوية
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    {form.salaryType === "fixed" ? "قيمة المرتب (جنيه)" : "النسبة المئوية (%)"}
+                  </label>
+                  <input
+                    type="number"
+                    value={form.salaryValue}
+                    onChange={e => setForm(p => ({...p, salaryValue: e.target.value}))}
+                    className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]"
+                    placeholder={form.salaryType === "fixed" ? "مثال: 3000" : "مثال: 40"}
+                    min="0"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">ملاحظات (اختياري)</label>
                 <textarea value={form.notes} onChange={e => setForm(p => ({...p, notes: e.target.value}))} className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003366]" rows={2} />
