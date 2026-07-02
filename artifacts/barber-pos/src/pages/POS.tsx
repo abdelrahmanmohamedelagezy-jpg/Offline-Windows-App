@@ -3,6 +3,7 @@ import { db, Barber, Service, InvoiceItem, PaymentMethod } from "@/lib/db";
 import { Trash2, Plus, Minus, Printer, RotateCcw, CheckCircle, Banknote, Smartphone, Wifi } from "lucide-react";
 import { openReceiptWindow } from "@/lib/printReceipt";
 import { getSettings } from "@/lib/settings";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CartItem extends InvoiceItem {}
 
@@ -13,6 +14,7 @@ const PAYMENT_OPTIONS: { value: PaymentMethod; label: string; icon: React.Elemen
 ];
 
 export default function POS() {
+  const { user } = useAuth();
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedBarber, setSelectedBarber] = useState<Barber | null>(null);
@@ -68,6 +70,7 @@ export default function POS() {
       invoiceId,
       type: "service",
       barberName: selectedBarber?.name,
+      cashierName: user?.name,
       clientName: clientName || undefined,
       clientPhone: clientPhone || undefined,
       items: cart,
