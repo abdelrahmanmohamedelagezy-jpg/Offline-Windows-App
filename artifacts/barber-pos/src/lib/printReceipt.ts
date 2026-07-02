@@ -49,10 +49,10 @@ export function openReceiptWindow(data: ReceiptData) {
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{background:#eee;font-family:'Cairo',sans-serif;direction:rtl;}
 .receipt{
-  width:300px;
-  margin:10px auto;
+  width:272px;
+  margin:8px auto;
   background:#fff;
-  padding:14px 12px 10px;
+  padding:10px 10px 8px;
   font-size:11px;
   line-height:1.5;
 }
@@ -96,11 +96,11 @@ tbody tr:last-child td{border-bottom:none;}
 .print-btn{background:#000;color:#fff;border:none;padding:9px 30px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
 @page{
   size: 80mm auto;
-  margin: 0;
+  margin: 3mm 4mm;
 }
 @media print{
-  html,body{background:#fff;width:80mm;}
-  .receipt{margin:0;padding:6px 5px;width:80mm;box-shadow:none;}
+  html,body{background:#fff;width:72mm;}
+  .receipt{margin:0 auto;padding:4px 2px;width:72mm;box-shadow:none;}
   .print-wrap{display:none!important;}
 }
 </style>
