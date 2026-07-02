@@ -94,9 +94,13 @@ tbody tr:last-child td{border-bottom:none;}
 /* ── print btn ── */
 .print-wrap{text-align:center;padding:12px;}
 .print-btn{background:#000;color:#fff;border:none;padding:9px 30px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+@page{
+  size: 80mm auto;
+  margin: 0;
+}
 @media print{
-  html,body{background:#fff;}
-  .receipt{margin:0;padding:8px 6px;}
+  html,body{background:#fff;width:80mm;}
+  .receipt{margin:0;padding:6px 5px;width:80mm;box-shadow:none;}
   .print-wrap{display:none!important;}
 }
 </style>
